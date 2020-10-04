@@ -6,6 +6,6 @@ const app = express()
 app.use(morgan('tiny'))
 app.use(express.json())
 
-app.use('/', require('./routers/router'))
+app.use('/binder', require('./routers/router'))
 
 app.listen(process.env.PORT)
