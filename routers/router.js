@@ -1,16 +1,21 @@
 const router = require('express').Router()
-const { users } = require('../database/level')
+const passport = require('passport')
 
-router.get('/add', (req, res) => {
-    users.put({username: 'foo', salt: 'salt', hash: 'hash'})
-    res.send('added')
+const { authenticate, isAdmin } = require('../auth/authUtils')
+
+require('../auth/passport')(passport)
+router.use(passport.initialize())
+
+router.use('/users', require('./userRouter'))
+
+router.get('/regular', (req, res) => {
+    res.send('regular endpoint')
 })
-router.get('/get', async (req, res) => {
-    res.send(await users.all())
+router.get('/authenticated', authenticate, async (req, res) => {
+    res.send('authenticated endpoint')
 })
-router.get('/del', (req, res) => {
-    users.del('foo')
-    res.send('deleted')
+router.get('/admin', authenticate, isAdmin, (req, res) => {
+    res.send('admin endpoint')
 })
 
 router.get('/', (req, res) => {
