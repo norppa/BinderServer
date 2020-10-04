@@ -1,0 +1,28 @@
+{
+  "name": "binderserver",
+  "version": "0.0.1",
+  "description": "A backend server for Binder web service",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/norppa/BinderServer.git"
+  },
+  "author": "Jari Haavisto",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/norppa/BinderServer/issues"
+  },
+  "homepage": "https://github.com/norppa/BinderServer#readme",
+  "dependencies": {
+    "dotenv": "^8.2.0",
+    "express": "^4.17.1",
+    "morgan": "^1.10.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.4"
+  }
+}
