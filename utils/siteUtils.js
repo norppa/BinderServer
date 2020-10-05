@@ -14,7 +14,7 @@ const register = async (site, password) => {
     try {
         await pool.query('INSERT INTO binder_sites (name, hash, salt) VALUES (?,?,?)', [site, hash, salt])
     } catch (error) {
-        if (error.code === 'ERR_DUP_ENTRY') {
+        if (error.code === 'ER_DUP_ENTRY') {
             return { error: 'SITE_EXISTS' }
         } else {
             return { error }

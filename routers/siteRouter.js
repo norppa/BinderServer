@@ -11,7 +11,7 @@ router.post('/register', async (req, res, next) => {
     const result = await siteUtils.register(site, password)
     if (result.error) {
         switch (result.error) {
-            case 'USERNAME_EXISTS': return res.send('Username already exists')
+            case 'SITE_EXISTS': return res.send('Site already exists')
             default: res.status(500).send(result.error)
         }
     }
