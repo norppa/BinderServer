@@ -1,4 +1,6 @@
 const router = require('express').Router()
+const passport = require('../auth/passport')
+
 
 const siteUtils = require('../utils/siteUtils')
 
@@ -30,6 +32,11 @@ router.post('/login', async (req, res) => {
     }
 
     res.send(JSON.stringify(result))
+})
+
+router.delete('/remove', passport.authenticate, async (req, res) => {
+    await siteUtils.remove(req.user.site)
+    res.send('Site removed: ' + req.user.site)
 })
 
 module.exports = router

@@ -4,16 +4,10 @@ const passport = require('../auth/passport')
 router.use(passport.initialize())
 
 router.use('/sites', require('./siteRouter'))
-
-router.get('/regular', (req, res) => {
-    res.send('regular endpoint')
-})
-router.get('/authenticated', passport.authenticate, async (req, res) => {
-    res.send('authenticated endpoint')
-})
+router.use('/files', passport.authenticate, require('./fileRouter'))
 
 router.get('/', (req, res) => {
-    res.send('OK')
+    res.send('Binder Server')
 })
 
 module.exports = router

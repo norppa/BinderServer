@@ -12,10 +12,10 @@ const register = async (site, password) => {
     const salt = crypto.randomBytes(32).toString('hex')
     const hash = crypto.pbkdf2Sync(password, salt, iterations, keylen, digest).toString('hex')
     try {
-        const result = await pool.query('INSERT INTO binder_sites (name, hash, salt) VALUES (?,?,?)', [site, hash, salt])
+        await pool.query('INSERT INTO binder_sites (name, hash, salt) VALUES (?,?,?)', [site, hash, salt])
     } catch (error) {
         if (error.code === 'ERR_DUP_ENTRY') {
-            return { error: 'USERNAME_EXISTS' }
+            return { error: 'SITE_EXISTS' }
         } else {
             return { error }
         }
@@ -45,4 +45,21 @@ const login = async (site, password) => {
     return { token: jwt.sign({ site }, PRIVATE_KEY, { expiresIn: '1d', algorithm: 'PS512' }) }
 }
 
-module.exports = { register, login }
+const remove = async (site) => {
+    const connection = await pool.getConnection()
+    try {
+        await connection.query('START TRANSACTION')
+        await connection.query('DELETE FROM binder_files WHERE site = ?', [site])
+        await connection.query('DELETE FROM binder_sites WHERE name = ?', [site])
+        await connection.query('COMMIT')
+        return results
+    } catch (error) {
+        connection.query('ROLLBACK')
+        return { error }
+    } finally {
+        connection.release()
+        connection.destroy()
+    }
+}
+
+module.exports = { register, login, remove }

@@ -1,6 +1,6 @@
 {
   "name": "binderserver",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "A backend server for Binder web service",
   "main": "server.js",
   "scripts": {
