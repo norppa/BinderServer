@@ -1,33 +1,80 @@
 const pool = require('../database/pool')
+const { validateInput, validateFile } = require('./validator')
 
-const validateFiles = (files) => {
-    try {
-        return files
-            .map(file => validateFile(file))
-            .reduce((acc, cur) => cur !== null ? acc.concat(cur) : acc, [])
-    } catch (error) {
-        if (error.name === 'TypeError') {
-            return ['Expected a list of file objects']
-        }
-        return [error.message]
-    }
+const getFiles = async (site) => {
+    console.log('getFiles', site)
+    const sql = 'SELECT id,name,folder,parent FROM binder_files WHERE owner = ?'
+    const values = [site]
+    const connection = await pool.getConnection()
+    console.log('got sql, values, connection')
+    const [rows, fields] = await connection.execute(sql, values)
+    return rows
+}
+
+const getFileContents = async (id, site) => {
+    console.log('getFileContents', id, site)
+    const sql = 'SELECT contents from binder_files WHERE id = ? and owner = ?'
+    const values = [id, site]
+    const connection = await pool.getConnection()
+    const [rows, fields] = await connection.execute(sql, values)
+    return rows[0]
 
 }
 
-const validateFile = (file) => {
-    const errors = []
-    const { name, create, update, remove } = file
-    if (!name) errors.push('File name is required: ' + JSON.stringify(file))
-    if (!!create + !!update + !!remove !== 1) errors.push('One and only one operation [create|remove|update] is required')
-    if (errors.length > 0) return errors
-    return null
+const splitByCondition = (list, condition) => {
+    const accepted = [], rejected = []
+    list.forEach(item => {
+        if (condition(item)) {
+            accepted.push(item)
+        } else {
+            rejected.push(item)
+        }
+    })
+    return [accepted, rejected]
+}
+
+const sortFiles = (files) => {
+    let removed = [], created = [], updated = []
+    // split. if file has more than one tag, priority is remove > create > update
+    files.forEach(file => {
+        if (file.remove) removed.push(file)
+        else if (file.create) created.push(file)
+        else if (file.update) updated.push(file)
+    })
+
+    // sort removed so that foreign key constraint does not break when deleting
+    // we want first the elements that have no children
+    const removedSorted = []
+    while (removed.length > 0) {
+        for (let i = removed.length - 1; i >= 0; i--) {
+            if (!removed.some(x => x.parent === removed[i].id)) {
+                removedSorted.unshift(removed.splice(i, 1)[0])
+            }
+        }
+    }
+
+    // sort created in similar fashion
+    // this time we want first the elements that have children
+    const createdSorted = []
+    while (created.length > 0) {
+        for (let i = created.length - 1; i >= 0; i--) {
+            if (!created.some(x => x.parent === created[i].id)) {
+                // created[i] has no children
+                createdSorted.push(created.splice(i, 1)[0])
+            }
+        }
+    }
+
+    // updated can be in any order
+    return [...removedSorted, ...createdSorted, ...updated]
 }
 
 const persist = async (files, site) => {
-    const connection = await pool.getConnection()
+    const errors = validateInput(files)
+    if (errors) return { errors }
 
-    const validationErrors = validateFiles(files)
-    if (validationErrors.length > 0) return { error: validationErrors }
+    files = sortFiles(files)
+    const connection = await pool.getConnection()
 
     try {
         await connection.query('START TRANSACTION')
@@ -50,48 +97,70 @@ const persist = async (files, site) => {
 }
 
 const persistFile = (file, site, connection) => {
-    if (file.create) return createFile(file, site, connection)
+    const errors = validateFile(file)
+    if (errors) return { errors }
+
+    if (file.create && file.folder) return createFolder(file, site, connection)
+    if (file.create && !file.folder) return createFile(file, site, connection)
     if (file.remove) return removeFile(file, site, connection)
-    else return updateFile(file, site, connection)
+    if (file.update) return updateFile(file, site, connection)
 }
 
 const createFile = async (file, site, connection) => {
-    const sql = 'INSERT INTO binder_files (name, contents, site) values (?,?,?)'
-    const values = [file.name, file.contents, site]
-    await connection.query(sql, values)
-    return { ...file, site }
+    const { name, parent, contents } = file
+    const sql = 'INSERT INTO binder_files (name,folder,parent,contents,owner)  values (?,?,?,?,?)'
+    const values = [name, false, parent, contents, site]
+    const result = await connection.query(sql, values)
+    const id = result[0].insertId
+    return { id, name, folder: false, parent, contents, create: true }
 }
 
-const updateFile = async (file, site, connection) => {
-    const oldFileName = file.update
-    const sql = 'UPDATE binder_files SET name = ?, contents = ? WHERE name = ? AND site = ?'
-    const values = [file.name, file.contents, oldFileName, site]
-    const [rows] = await connection.query(sql, values)
-    if (rows.affectedRows === 0) {
-        throw new Error('Invalid file name in update request: ' + oldFileName)
-    }
-    return { ...file }
+const createFolder = async (file, site, connection) => {
+    const { name, parent } = file
+    const sql = 'INSERT INTO binder_files (name,folder,parent,contents,owner)  values (?,?,?,?,?)'
+    const values = [name, true, parent, null, site]
+    const result = await connection.query(sql, values)
+    const id = result[0].insertId
+    return { id, name, folder: true, parent, contents: null, create: true }
 }
 
 const removeFile = async (file, site, connection) => {
-    const sql = 'DELETE FROM binder_files WHERE name = ? AND site = ?'
-    values = [file.name, site]
-    await connection.query(sql, values)
-    return { ...file }
+    const sql = 'DELETE FROM binder_files WHERE id = ? AND owner = ?'
+    values = [file.id, site]
+    const result = await connection.query(sql, values)
+    console.log('removeFile result', result)
+    return { id: file.id, remove: true }
 }
 
-// ADMIN TOOLS FOR TESTING ONLY
+const updateFile = async (file, site, connection) => {
+    let sql = 'UPDATE binder_files SET '
+    const values = []
+    const response = {}
+    if (file.name !== undefined) {
+        sql = sql + 'name = ?, '
+        values.push(file.name)
+        response.name = file.name
+    }
+    if (file.parent !== undefined) {
+        sql = sql + 'parent = ?, '
+        values.push(file.parent)
+        response.parent = file.parent
+    }
+    if (file.contents !== undefined) {
+        sql = sql + 'contents = ?, '
+        values.push(file.contents)
+        response.contents = file.contents
+    }
+    sql = sql.substring(0, sql.length - 2) + ' WHERE id = ? AND owner = ?'
+    values.push(file.id, site)
+    response.id = file.id
+    response.update = true
 
-const getAllFiles = async () => {
-    const sql = 'SELECT * FROM binder_files'
-    const [rows, fields] = await pool.query(sql)
-    return rows
+    const [result, error] = await connection.query(sql, values)
+    console.log('updateFile result', result)
+
+    return response
+
 }
 
-const deleteAllFiles = async () => {
-    await pool.query('DELETE FROM binder_files')
-}
-
-//
-
-module.exports = { persist, getAllFiles, deleteAllFiles }
+module.exports = { persist, getFiles, getFileContents }

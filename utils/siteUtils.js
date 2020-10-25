@@ -62,4 +62,10 @@ const remove = async (site) => {
     }
 }
 
-module.exports = { register, login, remove }
+const exists = async (site) => {
+    const connection = await pool.getConnection()
+    const [rows, fields] = await connection.query('SELECT * FROM binder_sites WHERE name = ?', [site])
+    return rows.length === 1
+}
+
+module.exports = { register, login, remove, exists }
