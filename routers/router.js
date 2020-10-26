@@ -8,7 +8,7 @@ router.use('/sites', require('./siteRouter'))
 router.use('/admin', passport.authenticate, require('./adminRouter'))
 
 router.post('/files', passport.authenticate, async (req, res) => {
-    console.log('updating site', req.body)
+    // console.log('updating site', req.body)
     const result = await fileUtils.persist(req.body, req.user.site)
     if (result.errors) {
         return res.status(400).send({ errors: result.errors})
@@ -18,7 +18,6 @@ router.post('/files', passport.authenticate, async (req, res) => {
 
 router.get('/files', passport.authenticate, async (req, res) => {
     const result = await fileUtils.getFiles(req.user.site)
-    console.log('we get files', result)
     if (result.error) {
         return res.status(400).send({ errors: result.error})
     }

@@ -21,18 +21,6 @@ const getFileContents = async (id, site) => {
 
 }
 
-const splitByCondition = (list, condition) => {
-    const accepted = [], rejected = []
-    list.forEach(item => {
-        if (condition(item)) {
-            accepted.push(item)
-        } else {
-            rejected.push(item)
-        }
-    })
-    return [accepted, rejected]
-}
-
 const sortFiles = (files) => {
     let removed = [], created = [], updated = []
     // split. if file has more than one tag, priority is remove > create > update
@@ -48,7 +36,7 @@ const sortFiles = (files) => {
     while (removed.length > 0) {
         for (let i = removed.length - 1; i >= 0; i--) {
             if (!removed.some(x => x.parent === removed[i].id)) {
-                removedSorted.unshift(removed.splice(i, 1)[0])
+                removedSorted.push(removed.splice(i, 1)[0])
             }
         }
     }
@@ -60,7 +48,7 @@ const sortFiles = (files) => {
         for (let i = created.length - 1; i >= 0; i--) {
             if (!created.some(x => x.parent === created[i].id)) {
                 // created[i] has no children
-                createdSorted.push(created.splice(i, 1)[0])
+                createdSorted.unshift(created.splice(i, 1)[0])
             }
         }
     }
@@ -74,13 +62,32 @@ const persist = async (files, site) => {
     if (errors) return { errors }
 
     files = sortFiles(files)
+    // console.log('PERSIST SORTED', files)
     const connection = await pool.getConnection()
 
     try {
         await connection.query('START TRANSACTION')
         let results = []
         for (let i = 0; i < files.length; i++) {
-            const result = await persistFile(files[i], site, connection)
+            const file = files[i]
+
+            const errors = validateFile(file)
+            if (errors) return { errors }
+            // console.log('validation done', errors)
+
+            let result
+            if (file.create) {
+                // requests use temporary id's, which need to be mapped to already created row id's
+                if (file.parent) {
+                    file.parent = results.find(result => result.temporaryId == file.parent).id
+                }
+                result = file.folder ? await createFolder(file, site, connection) : await createFile(file, site, connection)
+            } else if (file.remove) {
+                result = await removeFile(file, site, connection)
+            } else if (file.update) {
+                result = await updateFile(file, site, connection)
+            }
+
             results.push(result)
         }
         await connection.query('COMMIT')
@@ -96,23 +103,13 @@ const persist = async (files, site) => {
 
 }
 
-const persistFile = (file, site, connection) => {
-    const errors = validateFile(file)
-    if (errors) return { errors }
-
-    if (file.create && file.folder) return createFolder(file, site, connection)
-    if (file.create && !file.folder) return createFile(file, site, connection)
-    if (file.remove) return removeFile(file, site, connection)
-    if (file.update) return updateFile(file, site, connection)
-}
-
 const createFile = async (file, site, connection) => {
     const { name, parent, contents } = file
     const sql = 'INSERT INTO binder_files (name,folder,parent,contents,owner)  values (?,?,?,?,?)'
     const values = [name, false, parent, contents, site]
     const result = await connection.query(sql, values)
     const id = result[0].insertId
-    return { id, name, folder: false, parent, contents, create: true }
+    return { id, name, folder: false, parent, contents, create: true, temporaryId: file.id }
 }
 
 const createFolder = async (file, site, connection) => {
@@ -121,7 +118,7 @@ const createFolder = async (file, site, connection) => {
     const values = [name, true, parent, null, site]
     const result = await connection.query(sql, values)
     const id = result[0].insertId
-    return { id, name, folder: true, parent, contents: null, create: true }
+    return { id, name, folder: true, parent, contents: null, create: true, temporaryId: file.id }
 }
 
 const removeFile = async (file, site, connection) => {
