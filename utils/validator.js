@@ -56,11 +56,9 @@ const validateUpdate = (file) => {
 }
 
 const validateFile = (file) => {
-    console.log('validateFile', file)
     if (file.create) return validateCreate(file)
     if (file.remove) return validateRemove(file)
     if (file.update) return validateUpdate(file)
-    console.log('MISSING OP')
     return ['missing operation: ' + JSON.stringify(file)]
 }
 

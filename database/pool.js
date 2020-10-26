@@ -2,7 +2,7 @@ require('dotenv').config()
 const mysql = require('mysql2/promise')
 
 const dbConfig = {
-    connectionLimit : 10,
+    connectionLimit : 5,
     host: process.env.BINDER_DB_HOST,
     port: process.env.BINDER_DB_PORT,
     user: process.env.BINDER_DB_USERNAME,

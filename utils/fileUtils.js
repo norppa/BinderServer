@@ -2,23 +2,17 @@ const pool = require('../database/pool')
 const { validateInput, validateFile } = require('./validator')
 
 const getFiles = async (site) => {
-    console.log('getFiles', site)
     const sql = 'SELECT id,name,folder,parent FROM binder_files WHERE owner = ?'
     const values = [site]
-    const connection = await pool.getConnection()
-    console.log('got sql, values, connection')
-    const [rows, fields] = await connection.execute(sql, values)
+    const [rows, fields] = await pool.query(sql, values)
     return rows
 }
 
 const getFileContents = async (id, site) => {
-    console.log('getFileContents', id, site)
     const sql = 'SELECT contents from binder_files WHERE id = ? and owner = ?'
     const values = [id, site]
-    const connection = await pool.getConnection()
-    const [rows, fields] = await connection.execute(sql, values)
+    const [rows, fields] = await pool.query(sql, values)
     return rows[0]
-
 }
 
 const sortFiles = (files) => {
@@ -62,7 +56,6 @@ const persist = async (files, site) => {
     if (errors) return { errors }
 
     files = sortFiles(files)
-    // console.log('PERSIST SORTED', files)
     const connection = await pool.getConnection()
 
     try {
@@ -73,7 +66,6 @@ const persist = async (files, site) => {
 
             const errors = validateFile(file)
             if (errors) return { errors }
-            // console.log('validation done', errors)
 
             let result
             if (file.create) {
@@ -125,7 +117,6 @@ const removeFile = async (file, site, connection) => {
     const sql = 'DELETE FROM binder_files WHERE id = ? AND owner = ?'
     values = [file.id, site]
     const result = await connection.query(sql, values)
-    console.log('removeFile result', result)
     return { id: file.id, remove: true }
 }
 
@@ -154,8 +145,6 @@ const updateFile = async (file, site, connection) => {
     response.update = true
 
     const [result, error] = await connection.query(sql, values)
-    console.log('updateFile result', result)
-
     return response
 
 }

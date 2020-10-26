@@ -63,8 +63,7 @@ const remove = async (site) => {
 }
 
 const exists = async (site) => {
-    const connection = await pool.getConnection()
-    const [rows, fields] = await connection.query('SELECT * FROM binder_sites WHERE name = ?', [site])
+    const [rows, fields] = await pool.query('SELECT * FROM binder_sites WHERE name = ?', [site])
     return rows.length === 1
 }
 

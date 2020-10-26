@@ -42,7 +42,6 @@ router.delete('/remove', passport.authenticate, async (req, res) => {
 router.get('/exists/:site', async (req, res) => {
     const site = req.params.site
     const result = await siteUtils.exists(site)
-    console.log('site exists result', result)
     res.send({ [site]: result })
 })
 

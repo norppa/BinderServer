@@ -8,7 +8,6 @@ router.use('/sites', require('./siteRouter'))
 router.use('/admin', passport.authenticate, require('./adminRouter'))
 
 router.post('/files', passport.authenticate, async (req, res) => {
-    // console.log('updating site', req.body)
     const result = await fileUtils.persist(req.body, req.user.site)
     if (result.errors) {
         return res.status(400).send({ errors: result.errors})
