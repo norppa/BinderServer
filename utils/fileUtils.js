@@ -69,8 +69,10 @@ const persist = async (files, site) => {
 
             let result
             if (file.create) {
-                // requests use temporary id's, which need to be mapped to already created row id's
-                if (file.parent) {
+                // create requests use temporary id's, which need to be mapped to already created row id's
+                // if the id is a number, then it already exists in the database
+                // otherwise it is a string of form 'new_' plus running number
+                if (file.parent && file.parent.includes('new')) {
                     file.parent = results.find(result => result.temporaryId == file.parent).id
                 }
                 result = file.folder ? await createFolder(file, site, connection) : await createFile(file, site, connection)
