@@ -125,7 +125,7 @@ const removeFile = async (file, site, connection) => {
 const updateFile = async (file, site, connection) => {
     let sql = 'UPDATE binder_files SET '
     const values = []
-    const response = {}
+    const response = { folder: file.folder }
     if (file.name !== undefined) {
         sql = sql + 'name = ?, '
         values.push(file.name)
