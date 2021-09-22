@@ -34,6 +34,13 @@ router.post('/login', async (req, res) => {
     res.send(JSON.stringify(result))
 })
 
+router.post('/changePassword', passport.authenticate, async (req, res) => {
+    if (!req.body.password) return res.status(400).send('Password required')
+    const result = await siteUtils.changePassword(req.user.site, req.body.password)
+    if (result.error) res.status(500).send(result.error)
+    res.send(JSON.stringify(result))
+})
+
 router.delete('/remove', passport.authenticate, async (req, res) => {
     await siteUtils.remove(req.user.site)
     res.send('Site removed: ' + req.user.site)

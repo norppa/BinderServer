@@ -8,6 +8,13 @@ const iterations = 10000
 const keylen = 64
 const digest = 'sha512'
 
+const exists = async (site) => {
+    const [rows, fields] = await pool.query('SELECT * FROM binder_sites WHERE name = ?', [site])
+    return rows.length === 1
+}
+
+const generateToken = (site) => jwt.sign({ site }, PRIVATE_KEY, { algorithm: 'PS512' })
+
 const register = async (site, password) => {
     const salt = crypto.randomBytes(32).toString('hex')
     const hash = crypto.pbkdf2Sync(password, salt, iterations, keylen, digest).toString('hex')
@@ -21,7 +28,7 @@ const register = async (site, password) => {
         }
     }
 
-    return { token: jwt.sign({ site }, PRIVATE_KEY, { expiresIn: '1d', algorithm: 'PS512' }) }
+    return { token: generateToken(site) }
 }
 
 const login = async (site, password) => {
@@ -42,19 +49,34 @@ const login = async (site, password) => {
         return { error: 'INCORRECT_PASSWORD' }
     }
 
-    return { token: jwt.sign({ site }, PRIVATE_KEY, { expiresIn: '1d', algorithm: 'PS512' }) }
+    return { token: generateToken(site) }
+}
+
+const changePassword = async (site, newPassword) => {
+    const salt = crypto.randomBytes(32).toString('hex')
+    const hash = crypto.pbkdf2Sync(newPassword, salt, iterations, keylen, digest).toString('hex')
+    try {
+        await pool.query('UPDATE binder_sites SET hash = ?, salt = ? WHERE name = ?', [hash, salt, site])
+    } catch (error) {
+        return { error }
+    }
+
+    return { token: generateToken(site) }
+
 }
 
 const remove = async (site) => {
+    console.log('remove', site)
     const connection = await pool.getConnection()
     try {
         await connection.query('START TRANSACTION')
-        await connection.query('DELETE FROM binder_files WHERE site = ?', [site])
+        await connection.query('DELETE FROM binder_files WHERE owner = ?', [site])
         await connection.query('DELETE FROM binder_sites WHERE name = ?', [site])
         await connection.query('COMMIT')
-        return results
+        return {}
     } catch (error) {
         connection.query('ROLLBACK')
+        console.error('ROLLBACK', error)
         return { error }
     } finally {
         connection.release()
@@ -62,9 +84,4 @@ const remove = async (site) => {
     }
 }
 
-const exists = async (site) => {
-    const [rows, fields] = await pool.query('SELECT * FROM binder_sites WHERE name = ?', [site])
-    return rows.length === 1
-}
-
-module.exports = { register, login, remove, exists }
+module.exports = { exists, register, login, remove, changePassword }

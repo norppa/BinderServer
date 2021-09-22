@@ -8,4 +8,4 @@ app.use(express.json())
 
 app.use('/binder', require('./routers/router'))
 
-app.listen(process.env.PORT)
+app.listen(process.env.PORT, () => console.log('BinderServer running on port ' + process.env.PORT))
